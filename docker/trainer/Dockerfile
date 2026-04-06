@@ -1,5 +1,5 @@
 # deepmimo-trainer: base + PyTorch (CPU)
-FROM 192.168.1.112:5000/deepmimo-base:latest
+FROM localhost:5000/deepmimo-base:latest
 
 COPY offline-packages/wheels/ /tmp/wheels/
 COPY docker/trainer/requirements.txt /tmp/requirements.txt

@@ -3,7 +3,7 @@
 
 .PHONY: help build push setup compile run all clean
 
-REGISTRY     := 192.168.1.112:5000
+REGISTRY     := localhost:5000
 IMAGE_TAG    ?= latest
 KFP_ENDPOINT := http://192.168.1.112:31380
 

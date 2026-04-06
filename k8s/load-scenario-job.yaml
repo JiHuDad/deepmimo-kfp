@@ -13,7 +13,7 @@ spec:
       restartPolicy: Never
       initContainers:
         - name: load-data
-          image: 192.168.1.112:5000/deepmimo-base:latest
+          image: localhost:5000/deepmimo-base:latest
           command:
             - sh
             - -c
@@ -29,7 +29,7 @@ spec:
               mountPath: /data/scenarios
       containers:
         - name: verify
-          image: 192.168.1.112:5000/deepmimo-base:latest
+          image: localhost:5000/deepmimo-base:latest
           command:
             - sh
             - -c

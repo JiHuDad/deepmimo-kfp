@@ -14,7 +14,7 @@ from kfp.dsl import Input, Output, Dataset, Metrics
 
 
 @dsl.component(
-    base_image="192.168.1.112:5000/deepmimo-base:latest",
+    base_image="localhost:5000/deepmimo-base:latest",
     packages_to_install=[],
 )
 def preprocess(

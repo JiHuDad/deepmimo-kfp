@@ -3,7 +3,7 @@
 # 01-build-push-images.sh
 #
 # deepmimo-base 및 deepmimo-trainer Docker 이미지를 빌드하고
-# 로컬 레지스트리(192.168.1.112:5000)에 push한다.
+# 로컬 레지스트리(localhost:5000)에 push한다.
 #
 # 전제조건:
 #   - offline-packages/wheels/ 에 whl 파일이 있어야 함

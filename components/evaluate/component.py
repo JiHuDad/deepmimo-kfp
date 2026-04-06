@@ -12,7 +12,7 @@ from kfp.dsl import Input, Output, Dataset, Model, Metrics, ClassificationMetric
 
 
 @dsl.component(
-    base_image="192.168.1.112:5000/deepmimo-trainer:latest",
+    base_image="localhost:5000/deepmimo-trainer:latest",
     packages_to_install=[],
 )
 def evaluate(

@@ -3,7 +3,9 @@
 
 # 서버 IP (실제 IP로 수정)
 SERVER_IP="192.168.1.112"
-REGISTRY="${SERVER_IP}:5000"
+# Docker push/pull은 localhost:5000 사용 (HTTP 허용, insecure-registries 불필요)
+# k3s containerd도 registries.yaml에서 localhost:5000 HTTP 허용으로 설정됨
+REGISTRY="localhost:5000"
 KFP_ENDPOINT="http://${SERVER_IP}:31380"
 
 # 이미지 태그

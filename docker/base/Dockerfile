@@ -1,6 +1,6 @@
 # deepmimo-base: DeepMIMO + 공통 과학 계산 환경
 # 폐쇄망: 오프라인 wheels 사용, FROM은 로컬 레지스트리 참조
-FROM 192.168.1.112:5000/python:3.12-slim
+FROM localhost:5000/python:3.12-slim
 
 WORKDIR /app
 
