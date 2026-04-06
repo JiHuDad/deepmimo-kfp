@@ -5,6 +5,7 @@ dist/
 build/
 .venv/
 venv/
+env/
 .env
 
 # 컴파일된 파이프라인 (재생성 가능)

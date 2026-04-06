@@ -12,18 +12,25 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WHEELS_DIR="${SCRIPT_DIR}/wheels"
+VENV_DIR="${PROJECT_ROOT}/.venv"
 mkdir -p "${WHEELS_DIR}"
+
+# Ubuntu 24.04은 시스템 pip 사용 불가(PEP 668).
+# 가상환경을 생성하고 그 안의 pip로 download한다.
+if [[ ! -f "${VENV_DIR}/bin/pip" ]]; then
+    echo "[INFO] 가상환경 생성 중: ${VENV_DIR}"
+    python3 -m venv "${VENV_DIR}"
+fi
+PIP="${VENV_DIR}/bin/pip"
+echo "[INFO] pip: $("${PIP}" --version)"
 
 echo "=== [1/3] Python 패키지 (whl) 수집 ==="
 
-# 이 스크립트는 타겟 서버(Ubuntu 24.04 x86_64 Python 3.12)에서 직접 실행한다.
-# 따라서 --platform/--python-version 지정 없이 현재 환경에 맞는 whl을 자동으로 받는다.
-# pip는 실행 환경의 Python 버전과 플랫폼(manylinux 태그 포함)을 자동 감지한다.
-
 # [A] KFP SDK + DeepMIMO
 echo "[A] KFP SDK + DeepMIMO"
-pip download \
+"${PIP}" download \
     kfp==2.15.0 \
     kfp-kubernetes \
     "DeepMIMO==4.0.0" \
@@ -32,7 +39,7 @@ pip download \
 
 # [B] 과학 계산 스택 (numpy, scipy 등 C 확장 포함)
 echo "[B] numpy / scipy / matplotlib / h5py / scikit-learn"
-pip download \
+"${PIP}" download \
     "numpy>=1.24,<2.0" \
     "scipy>=1.11" \
     "matplotlib>=3.7" \
@@ -43,7 +50,7 @@ pip download \
 
 # [C] PyTorch CPU-only (용량 주의: ~700MB)
 echo "[C] PyTorch CPU"
-pip download \
+"${PIP}" download \
     torch==2.2.2+cpu \
     torchvision==0.17.2+cpu \
     --dest "${WHEELS_DIR}" \
