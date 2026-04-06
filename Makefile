@@ -15,8 +15,11 @@ help: ## 사용 가능한 명령 목록
 	  awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # ── 폐쇄망 준비 ───────────────────────────────────────────
-collect: ## [온라인 머신] whl/이미지 수집 (offline-packages/collect.sh)
+collect: ## [온라인 머신] whl/이미지/시나리오 수집 (offline-packages/collect.sh)
 	@bash offline-packages/collect.sh
+
+copy-scenarios: ## USB 복사 후 시나리오를 호스트 경로에 배치
+	@bash scripts/00-copy-scenarios.sh
 
 install-sdk: ## KFP SDK 오프라인 설치
 	@bash scripts/02-install-kfp-sdk.sh

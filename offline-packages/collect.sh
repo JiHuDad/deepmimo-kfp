@@ -74,17 +74,38 @@ docker save python:3.12-slim -o "${SCRIPT_DIR}/python-3.12-slim.tar"
 echo "저장 완료: python-3.12-slim.tar ($(du -sh "${SCRIPT_DIR}/python-3.12-slim.tar" | cut -f1))"
 
 echo ""
-echo "=== [3/3] DeepMIMO 시나리오 데이터 안내 ==="
-cat <<'EOF'
-  deepmimo.net 에서 O1_60 시나리오를 수동으로 다운로드하세요:
-  - URL: https://deepmimo.net/scenarios/o1-scenario/
-  - 다운로드 후 압축 해제하여 USB에 포함
-  - 폐쇄망 서버의 ~/data/deepmimo-scenarios/O1_60/ 에 배치 (기본값)
-EOF
+echo "=== [3/3] DeepMIMO 시나리오 데이터 다운로드 ==="
+
+SCENARIOS_DIR="${SCRIPT_DIR}/scenarios"
+SCENARIOS="${DEEPMIMO_SCENARIOS:-O1_60}"   # 쉼표 구분으로 여러 개 지정 가능
+
+mkdir -p "${SCENARIOS_DIR}"
+
+# DeepMIMO 설치 후 dm.download() 사용
+PYTHON="${VENV_DIR}/bin/python"
+"${PIP}" install --quiet "DeepMIMO==4.0.0" --find-links="${WHEELS_DIR}" --prefer-binary
+
+IFS=',' read -ra SCENARIO_LIST <<< "${SCENARIOS}"
+for scenario in "${SCENARIO_LIST[@]}"; do
+    scenario="$(echo "${scenario}" | tr -d ' ')"
+    if [[ -d "${SCENARIOS_DIR}/${scenario}" ]]; then
+        echo "[INFO] '${scenario}' 이미 존재, 건너뜀"
+        continue
+    fi
+    echo "[INFO] '${scenario}' 다운로드 중..."
+    "${PYTHON}" - <<PYEOF
+import deepmimo as dm
+import os
+dm.download('${scenario}', destination='${SCENARIOS_DIR}')
+print(f"[OK] ${scenario} 다운로드 완료 → ${SCENARIOS_DIR}/${scenario}")
+PYEOF
+done
+
+echo "시나리오 목록: $(ls "${SCENARIOS_DIR}")"
 
 echo ""
 echo "=== 수집 완료 ==="
 echo "USB에 복사할 파일:"
-echo "  - offline-packages/wheels/ ($(du -sh "${WHEELS_DIR}" | cut -f1))"
+echo "  - offline-packages/wheels/    ($(du -sh "${WHEELS_DIR}" | cut -f1))"
 echo "  - offline-packages/python-3.12-slim.tar"
-echo "  - (수동) DeepMIMO O1_60 시나리오 폴더"
+echo "  - offline-packages/scenarios/ ($(du -sh "${SCENARIOS_DIR}" | cut -f1))"

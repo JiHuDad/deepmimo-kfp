@@ -17,8 +17,9 @@ offline-packages/wheels/
 offline-packages/*.tar
 offline-packages/*.whl
 
-# 시나리오 데이터 (용량이 크므로 git에서 제외, LFS 또는 별도 관리)
+# 시나리오 데이터 (용량이 크므로 git에서 제외)
 scenarios/
+offline-packages/scenarios/
 *.mat
 
 # 모델 체크포인트
