@@ -17,39 +17,44 @@ mkdir -p "${WHEELS_DIR}"
 
 echo "=== [1/3] Python 패키지 (whl) 수집 ==="
 
-# --prefer-binary: 바이너리 whl 우선, 없으면 sdist 허용 (kfp-server-api 같은 pure-python sdist 대응)
-# --platform / --python-version: 타겟이 linux x86_64 Python 3.12 임을 명시하되
-#   pure-python 패키지는 플랫폼 태그 없이 받을 수 있으므로 두 번 나눠서 실행
+# pip 규칙: --platform/--python-version 사용 시 반드시 --only-binary :all: 이어야 함.
+# 따라서 패키지를 세 그룹으로 분리:
+#   [A] pure-python 패키지 → 플랫폼 제약 없이 --prefer-binary
+#   [B] C 확장 패키지    → --platform linux_x86_64 --only-binary :all:
+#   [C] PyTorch         → pytorch whl index + --only-binary :all:
 
-# KFP SDK: pure-python 패키지 다수 포함 → 플랫폼 제한 없이 수집
-pip download kfp==2.15.0 kfp-kubernetes \
+# [A] pure-python: kfp, kfp-kubernetes, DeepMIMO (바이너리 없어도 sdist OK)
+echo "[A] KFP SDK + DeepMIMO (pure-python, 플랫폼 제약 없음)"
+pip download \
+    kfp==2.15.0 \
+    kfp-kubernetes \
+    "DeepMIMO==3.0.0" \
     --dest "${WHEELS_DIR}" \
     --prefer-binary
 
-# DeepMIMO 및 과학 계산 스택: C 확장 포함 → linux_x86_64 바이너리 지정
+# [B] C 확장 패키지: linux_x86_64 바이너리만 허용
+echo "[B] numpy/scipy/matplotlib/h5py/scikit-learn (linux_x86_64 바이너리)"
 pip download \
-    "DeepMIMO==3.0.0" \
     "numpy>=1.24,<2.0" \
     "scipy>=1.11" \
     "matplotlib>=3.7" \
     "h5py>=3.9" \
     "scikit-learn>=1.3" \
     --dest "${WHEELS_DIR}" \
-    --prefer-binary \
     --python-version 3.12 \
     --platform linux_x86_64 \
-    --only-binary numpy,scipy,matplotlib,h5py,scikit-learn
+    --only-binary :all:
 
-# PyTorch CPU-only (용량 주의: ~700MB)
+# [C] PyTorch CPU-only (용량 주의: ~700MB)
+echo "[C] PyTorch CPU (linux_x86_64 바이너리)"
 pip download \
     torch==2.2.2+cpu \
     torchvision==0.17.2+cpu \
     --dest "${WHEELS_DIR}" \
     --index-url https://download.pytorch.org/whl/cpu \
-    --prefer-binary \
     --python-version 3.12 \
     --platform linux_x86_64 \
-    --only-binary torch,torchvision
+    --only-binary :all:
 
 echo "whl 파일 수: $(ls "${WHEELS_DIR}" | wc -l)"
 
