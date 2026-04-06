@@ -16,14 +16,17 @@ WHEELS_DIR="${SCRIPT_DIR}/wheels"
 mkdir -p "${WHEELS_DIR}"
 
 echo "=== [1/3] Python 패키지 (whl) 수집 ==="
-# KFP SDK (서버의 KFP 버전과 일치시킬 것)
+
+# --prefer-binary: 바이너리 whl 우선, 없으면 sdist 허용 (kfp-server-api 같은 pure-python sdist 대응)
+# --platform / --python-version: 타겟이 linux x86_64 Python 3.12 임을 명시하되
+#   pure-python 패키지는 플랫폼 태그 없이 받을 수 있으므로 두 번 나눠서 실행
+
+# KFP SDK: pure-python 패키지 다수 포함 → 플랫폼 제한 없이 수집
 pip download kfp==2.15.0 kfp-kubernetes \
     --dest "${WHEELS_DIR}" \
-    --python-version 3.12 \
-    --platform linux_x86_64 \
-    --only-binary :all:
+    --prefer-binary
 
-# DeepMIMO 및 과학 계산 스택
+# DeepMIMO 및 과학 계산 스택: C 확장 포함 → linux_x86_64 바이너리 지정
 pip download \
     "DeepMIMO==3.0.0" \
     "numpy>=1.24,<2.0" \
@@ -32,9 +35,10 @@ pip download \
     "h5py>=3.9" \
     "scikit-learn>=1.3" \
     --dest "${WHEELS_DIR}" \
+    --prefer-binary \
     --python-version 3.12 \
     --platform linux_x86_64 \
-    --only-binary :all:
+    --only-binary numpy,scipy,matplotlib,h5py,scikit-learn
 
 # PyTorch CPU-only (용량 주의: ~700MB)
 pip download \
@@ -42,9 +46,10 @@ pip download \
     torchvision==0.17.2+cpu \
     --dest "${WHEELS_DIR}" \
     --index-url https://download.pytorch.org/whl/cpu \
+    --prefer-binary \
     --python-version 3.12 \
     --platform linux_x86_64 \
-    --only-binary :all:
+    --only-binary torch,torchvision
 
 echo "whl 파일 수: $(ls "${WHEELS_DIR}" | wc -l)"
 
