@@ -28,7 +28,7 @@ echo "[A] KFP SDK + DeepMIMO (pure-python, 플랫폼 제약 없음)"
 pip download \
     kfp==2.15.0 \
     kfp-kubernetes \
-    "DeepMIMO==3.0.0" \
+    "DeepMIMO==4.0.0" \
     --dest "${WHEELS_DIR}" \
     --prefer-binary
 

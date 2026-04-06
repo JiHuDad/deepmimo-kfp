@@ -1,14 +1,12 @@
 """
-deepmimo_beam_selection 파이프라인
+deepmimo_beam_selection 파이프라인 (DeepMIMO v4)
 
-DeepMIMO 레이트레이싱 채널 데이터를 이용한 빔 선택 모델 학습 파이프라인.
-폐쇄망 환경 기준: 시나리오 데이터는 PVC에 사전 적재되어 있어야 한다.
+DeepMIMO v4 API 기반 빔 선택 모델 학습 파이프라인.
+폐쇄망 환경 기준: 시나리오 데이터는 deepmimo-scenarios PVC에 사전 적재.
 
 파이프라인 순서:
   load_scenario → preprocess → train → evaluate
 """
-
-import json
 
 from kfp import compiler, dsl, kubernetes
 
@@ -17,29 +15,21 @@ from components.preprocess.component import preprocess
 from components.train.component import train
 from components.evaluate.component import evaluate
 
-# ── 기본 DeepMIMO 파라미터 ─────────────────────────────────────────────────
-DEFAULT_DEEPMIMO_PARAMS = json.dumps({
-    "num_paths": 5,
-    "active_BS": [1],
-    "user_row_first": 1,
-    "user_row_last": 100,
-    "subcarriers": 512,
-    "bandwidth": 0.5,
-    "num_OFDM_subcarriers": 512,
-    "OFDM_limit": 32,
-})
-
 
 @dsl.pipeline(
     name="deepmimo-beam-selection",
-    description="DeepMIMO 레이트레이싱 데이터 기반 빔 선택 파이프라인 (폐쇄망)",
+    description="DeepMIMO v4 레이트레이싱 데이터 기반 빔 선택 파이프라인 (폐쇄망)",
 )
 def deepmimo_pipeline(
-    # 시나리오 설정
+    # 시나리오
     scenario_name: str = "O1_60",
     scenario_source_path: str = "/data/scenarios",
-    deepmimo_params: str = DEFAULT_DEEPMIMO_PARAMS,
-    # 데이터 분할 비율
+    # DeepMIMO v4 채널 파라미터
+    bs_antenna_shape: str = "8,1",       # BS 안테나 배열 (n_h, n_v)
+    num_subcarriers: int = 512,
+    bandwidth: float = 50.0,             # MHz
+    num_paths: int = 5,                  # 0 = 전체 경로
+    # 데이터 분할
     train_ratio: float = 0.7,
     val_ratio: float = 0.15,
     # 학습 하이퍼파라미터
@@ -54,7 +44,6 @@ def deepmimo_pipeline(
         scenario_name=scenario_name,
         scenario_source_path=scenario_source_path,
     )
-    # PVC 마운트: 시나리오 데이터가 사전 적재된 deepmimo-scenarios PVC
     kubernetes.mount_pvc(
         load_task,
         pvc_name="deepmimo-scenarios",
@@ -62,10 +51,14 @@ def deepmimo_pipeline(
     )
     load_task.set_display_name("1. 시나리오 로드")
 
-    # ── Step 2: 전처리 ───────────────────────────────────────
+    # ── Step 2: 채널 생성 및 분할 ────────────────────────────
     preprocess_task = preprocess(
         scenario_dataset=load_task.outputs["output_scenario"],
-        parameters_json=deepmimo_params,
+        scenario_name=scenario_name,
+        bs_antenna_shape=bs_antenna_shape,
+        num_subcarriers=num_subcarriers,
+        bandwidth=bandwidth,
+        num_paths=num_paths,
         train_ratio=train_ratio,
         val_ratio=val_ratio,
     )

@@ -1,9 +1,12 @@
 """
-preprocess 컴포넌트
+preprocess 컴포넌트 (DeepMIMO v4 API)
 
-DeepMIMO.generate_data()를 호출하여 레이트레이싱 기반 채널 행렬을 생성한다.
-생성된 채널 데이터는 numpy 파일로 저장하고,
-학습/검증/테스트 분리까지 수행한다.
+DeepMIMO v4 워크플로우:
+  dm.load(scenario, dataset_folder=...) → dataset
+  dm.ChannelParameters() → params
+  dataset.compute_channels(params) → channels  shape: [N, n_rx, n_tx, n_subcarr]
+
+채널 데이터를 생성하고 train/val/test 로 분리한다.
 """
 
 from kfp import dsl
@@ -16,7 +19,11 @@ from kfp.dsl import Input, Output, Dataset, Metrics
 )
 def preprocess(
     scenario_dataset: Input[Dataset],
-    parameters_json: str,
+    scenario_name: str,
+    bs_antenna_shape: str,
+    num_subcarriers: int,
+    bandwidth: float,
+    num_paths: int,
     train_ratio: float,
     val_ratio: float,
     output_train: Output[Dataset],
@@ -25,77 +32,88 @@ def preprocess(
     output_metrics: Output[Metrics],
 ) -> None:
     """
-    DeepMIMO 채널 생성 및 train/val/test 분리.
+    DeepMIMO v4 채널 생성 및 train/val/test 분리.
 
-    parameters_json 예시:
-    {
-        "num_paths": 5,
-        "active_BS": [1],
-        "user_row_first": 1,
-        "user_row_last": 100,
-        "subcarriers": 512,
-        "bandwidth": 0.5,
-        "num_OFDM_subcarriers": 512,
-        "OFDM_limit": 32
-    }
+    bs_antenna_shape: 쉼표 구분 문자열, 예: "8,1" → [8, 1]
+    num_paths: 0 이면 전체 경로 사용 (None)
     """
-    import json
     import os
 
-    import DeepMIMO
+    import deepmimo as dm
     import numpy as np
 
-    # 파라미터 로드
-    params = DeepMIMO.default_params()
-    user_params = json.loads(parameters_json)
-    params.update(user_params)
-    params["dataset_folder"] = scenario_dataset.path
+    # ── DeepMIMO 데이터셋 로드 ──────────────────────────────
+    dataset_folder = scenario_dataset.path
+    print(f"[preprocess] 시나리오 로드: {scenario_name} ← {dataset_folder}")
+    print(f"[preprocess] 폴더 내용: {os.listdir(dataset_folder)}")
 
-    print(f"[preprocess] DeepMIMO 파라미터: {params}")
-    print(f"[preprocess] 시나리오 경로: {scenario_dataset.path}")
+    dataset = dm.load(scenario_name, dataset_folder=dataset_folder)
+    print(f"[preprocess] 로드 완료. 사용자 수: {dataset.num_users}")
+    dataset.info()
 
-    # 채널 생성
-    dataset = DeepMIMO.generate_data(params)
+    # ── 채널 파라미터 설정 (ChannelParameters) ──────────────
+    params = dm.ChannelParameters()
 
-    # 채널 행렬 추출: shape (N_users, N_ant, N_subcarr, N_paths) -> 복소수
-    channel = dataset[0]["user"]["channel"]
-    n_users = channel.shape[0]
-    print(f"[preprocess] 채널 shape: {channel.shape}, dtype: {channel.dtype}")
+    # BS 안테나 (예: "8,1" → shape=[8,1])
+    ant_shape = [int(x) for x in bs_antenna_shape.split(",")]
+    params.bs_antenna.shape = ant_shape
+    params.bs_antenna.spacing = 0.5
 
-    # 빔 선택 레이블 생성 (각 사용자의 최적 빔 인덱스)
-    # 간단 버전: 채널 크기가 가장 큰 안테나 인덱스를 레이블로 사용
-    channel_power = np.abs(channel[:, :, 0, 0]) ** 2  # (N_users, N_ant)
-    labels = np.argmax(channel_power, axis=1)          # (N_users,)
+    # UE 안테나 (단일 안테나 수신기)
+    params.ue_antenna.shape = [1, 1]
+    params.ue_antenna.spacing = 0.5
 
-    # 특징 벡터: 채널 절대값 (실수 입력으로 변환)
-    # shape: (N_users, N_ant * 2) — real/imag concat
-    ch_flat = channel[:, :, 0, 0]  # (N_users, N_ant), 첫 번째 서브캐리어
+    # OFDM 파라미터
+    params.num_subcarriers = num_subcarriers
+    params.bandwidth = bandwidth
+
+    # 경로 수 제한 (0이면 전체)
+    params.num_paths = num_paths if num_paths > 0 else None
+
+    # ── 채널 생성 ────────────────────────────────────────────
+    print(f"[preprocess] 채널 생성 중... (안테나: {ant_shape}, 서브캐리어: {num_subcarriers})")
+    channels = dataset.compute_channels(params)
+    # shape: [N_users, n_rx_ant, n_tx_ant, n_subcarriers]
+    print(f"[preprocess] 채널 shape: {channels.shape}, dtype: {channels.dtype}")
+
+    n_users = channels.shape[0]
+    n_tx = channels.shape[2]  # BS 안테나 수
+
+    # ── 빔 선택 레이블 생성 ───────────────────────────────────
+    # 첫 번째 서브캐리어 기준, UE 안테나 0번 기준으로 최적 BS 빔 인덱스 결정
+    ch_first = channels[:, 0, :, 0]  # (N_users, n_tx) — 첫 서브캐리어
+    labels = np.argmax(np.abs(ch_first) ** 2, axis=1).astype(np.int64)  # (N_users,)
+
+    # ── 특징 벡터: 첫 서브캐리어의 real/imag concat ──────────
     features = np.concatenate(
-        [np.real(ch_flat), np.imag(ch_flat)], axis=1
-    ).astype(np.float32)
+        [np.real(ch_first), np.imag(ch_first)], axis=1
+    ).astype(np.float32)  # (N_users, n_tx * 2)
 
-    # train / val / test 분리
+    print(f"[preprocess] features: {features.shape}, labels: {labels.shape}, classes: {labels.max()+1}")
+
+    # ── train / val / test 분리 ──────────────────────────────
     idx = np.random.permutation(n_users)
     n_train = int(n_users * train_ratio)
-    n_val = int(n_users * val_ratio)
+    n_val   = int(n_users * val_ratio)
 
-    def _save_split(output: Output[Dataset], indices, name: str):
+    def _save(output: Output[Dataset], indices, name: str):
         os.makedirs(output.path, exist_ok=True)
         np.save(os.path.join(output.path, "features.npy"), features[indices])
-        np.save(os.path.join(output.path, "labels.npy"), labels[indices])
-        np.save(os.path.join(output.path, "channel.npy"), channel[indices])
-        print(f"[preprocess] {name}: {len(indices)} 샘플 저장 → {output.path}")
+        np.save(os.path.join(output.path, "labels.npy"),   labels[indices])
+        # 전체 채널도 저장 (evaluate에서 SE 계산 용도)
+        np.save(os.path.join(output.path, "channel.npy"),  channels[indices])
+        print(f"[preprocess] {name}: {len(indices)}개 샘플 → {output.path}")
 
-    _save_split(output_train, idx[:n_train], "train")
-    _save_split(output_val,   idx[n_train:n_train + n_val], "val")
-    _save_split(output_test,  idx[n_train + n_val:], "test")
+    _save(output_train, idx[:n_train],            "train")
+    _save(output_val,   idx[n_train:n_train+n_val], "val")
+    _save(output_test,  idx[n_train+n_val:],       "test")
 
-    # 메트릭 기록
-    output_metrics.log_metric("total_users", n_users)
-    output_metrics.log_metric("n_train", n_train)
-    output_metrics.log_metric("n_val", n_val)
-    output_metrics.log_metric("n_test", n_users - n_train - n_val)
-    output_metrics.log_metric("n_bs_antennas", int(channel.shape[1]))
-    output_metrics.log_metric("n_subcarriers", int(channel.shape[2]))
-    output_metrics.log_metric("feature_dim", features.shape[1])
-    output_metrics.log_metric("num_classes", int(labels.max()) + 1)
+    # ── KFP 메트릭 ───────────────────────────────────────────
+    output_metrics.log_metric("total_users",   n_users)
+    output_metrics.log_metric("n_train",       n_train)
+    output_metrics.log_metric("n_val",         n_val)
+    output_metrics.log_metric("n_test",        n_users - n_train - n_val)
+    output_metrics.log_metric("n_bs_antennas", n_tx)
+    output_metrics.log_metric("n_subcarriers", num_subcarriers)
+    output_metrics.log_metric("feature_dim",   features.shape[1])
+    output_metrics.log_metric("num_classes",   int(labels.max()) + 1)
