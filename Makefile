@@ -5,7 +5,8 @@
 
 REGISTRY     := localhost:5000
 IMAGE_TAG    ?= latest
-KFP_ENDPOINT := http://192.168.1.112:31380
+KFP_UI       := http://192.168.1.112:31380
+# KFP API는 ClusterIP라 port-forward 필요 → scripts/04-compile-and-run.sh에서 자동 처리
 
 export IMAGE_TAG
 export KFP_ENDPOINT

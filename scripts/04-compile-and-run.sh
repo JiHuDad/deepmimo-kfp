@@ -9,6 +9,8 @@ source "$(dirname "$0")/lib/common.sh"
 cd "${PROJECT_ROOT}"
 
 require_cmd python3
+ensure_venv
+start_kfp_portforward
 
 PIPELINE_YAML="deepmimo_pipeline.yaml"
 PIPELINE_NAME="${PIPELINE_NAME:-deepmimo-beam-selection}"
@@ -59,4 +61,4 @@ print(f"KFP UI에서 확인: ${KFP_ENDPOINT}/#/runs/details/{run.run_id}")
 PYTHON
 
 log_ok "파이프라인 실행 완료. KFP UI에서 진행 상황을 확인하세요:"
-log_ok "  ${KFP_ENDPOINT}"
+log_ok "  http://${SERVER_IP}:31380"
