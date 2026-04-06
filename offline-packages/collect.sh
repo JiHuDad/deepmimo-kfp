@@ -95,9 +95,8 @@ for scenario in "${SCENARIO_LIST[@]}"; do
     echo "[INFO] '${scenario}' 다운로드 중..."
     "${PYTHON}" - <<PYEOF
 import deepmimo as dm
-import os
-dm.download('${scenario}', destination='${SCENARIOS_DIR}')
-print(f"[OK] ${scenario} 다운로드 완료 → ${SCENARIOS_DIR}/${scenario}")
+dm.download('${scenario}', output_dir='${SCENARIOS_DIR}')
+print('[OK] ${scenario} 다운로드 완료 → ${SCENARIOS_DIR}')
 PYEOF
 done
 
