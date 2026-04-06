@@ -28,6 +28,14 @@ echo "[INFO] pip: $("${PIP}" --version)"
 
 echo "=== [1/3] Python 패키지 (whl) 수집 ==="
 
+# [A0] 빌드 도구 (kfp-server-api 같은 sdist 빌드에 필요)
+echo "[A0] setuptools / wheel (sdist 빌드 도구)"
+"${PIP}" download \
+    "setuptools>=40.8.0" \
+    wheel \
+    --dest "${WHEELS_DIR}" \
+    --prefer-binary
+
 # [A] KFP SDK + DeepMIMO
 echo "[A] KFP SDK + DeepMIMO"
 "${PIP}" download \
