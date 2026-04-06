@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# ============================================================
+# 02-install-kfp-sdk.sh
+#
+# KFP Python SDK를 오프라인 wheels에서 설치한다.
+#
+# 전제조건:
+#   - offline-packages/wheels/ 에 kfp 관련 whl 파일이 있어야 함
+# ============================================================
+set -euo pipefail
+source "$(dirname "$0")/lib/common.sh"
+cd "${PROJECT_ROOT}"
+
+require_cmd pip
+
+WHEELS_DIR="offline-packages/wheels"
+
+if [[ ! -d "${WHEELS_DIR}" || -z "$(ls -A "${WHEELS_DIR}" 2>/dev/null)" ]]; then
+    log_error "'${WHEELS_DIR}' 디렉토리가 비어있거나 존재하지 않습니다."
+    log_error "온라인 머신에서 offline-packages/collect.sh를 먼저 실행하세요."
+    exit 1
+fi
+
+log_info "KFP SDK 오프라인 설치 중..."
+pip install \
+    --no-index \
+    --find-links="${WHEELS_DIR}" \
+    kfp==2.15.0 \
+    kfp-kubernetes
+
+log_ok "설치 완료."
+pip show kfp | grep -E "^(Name|Version)"
+pip show kfp-kubernetes | grep -E "^(Name|Version)"

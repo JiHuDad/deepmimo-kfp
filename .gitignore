@@ -1,0 +1,37 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+.env
+
+# 컴파일된 파이프라인 (재생성 가능)
+*.yaml
+!k8s/*.yaml
+
+# 오프라인 패키지 (용량이 크므로 git에서 제외)
+offline-packages/wheels/
+offline-packages/*.tar
+offline-packages/*.whl
+
+# 시나리오 데이터 (용량이 크므로 git에서 제외, LFS 또는 별도 관리)
+scenarios/
+*.mat
+
+# 모델 체크포인트
+*.pt
+*.pth
+*.ckpt
+
+# 로그
+*.log
+runs/
+
+# Jupyter 체크포인트
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+.vscode/
