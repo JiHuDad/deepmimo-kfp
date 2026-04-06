@@ -83,20 +83,28 @@ def evaluate(
     # ── Spectral Efficiency 비율 ─────────────────────────────
     # SE 비율 = SE(predicted beam) / SE(optimal beam)
     # SE ∝ log2(1 + |h^H * f|^2 / noise) 에서 noise=1로 단순화
-    ch = channel_test[:, :, 0, 0]  # (N, N_ant)
+    ch = channel_test[:, 0, :, 0]  # (N, n_tx_ant) — 첫 서브캐리어, 첫 RX 안테나
+    print(f"[evaluate] ch shape: {ch.shape}, dtype: {ch.dtype}")
+    print(f"[evaluate] ch mean abs: {np.abs(ch).mean():.2e}, max: {np.abs(ch).max():.2e}")
 
-    def beam_se(h_vec, beam_idx):
-        """단순 빔포밍 SE 계산 (DFT 코드북 기준)."""
+    # 채널을 사용자별 RMS로 정규화 (채널 크기의 절대값에 무관하게 SE 비율 계산)
+    ch_rms = np.sqrt((np.abs(ch) ** 2).mean(axis=1, keepdims=True)) + 1e-30
+    ch_norm = ch / ch_rms  # (N, n_ant), 정규화된 채널
+
+    def beam_se(h_vec, beam_indices):
+        """DFT 코드북 기반 빔포밍 SE 계산 (SNR=20dB 가정)."""
         n_ant = h_vec.shape[1]
+        snr = 100.0  # 20dB
         beams = np.exp(
             2j * np.pi * np.arange(n_ant)[:, None]
             * np.arange(n_ant)[None, :] / n_ant
         ) / np.sqrt(n_ant)  # (n_ant, n_ant) DFT codebook
-        bf_gain = np.abs(h_vec @ beams[:, beam_idx]) ** 2  # (N,)
-        return np.log2(1 + bf_gain)
+        selected_beams = beams[:, beam_indices]  # (n_ant, N)
+        bf_gain = np.abs(np.einsum("ni,in->n", h_vec, selected_beams)) ** 2  # (N,)
+        return np.log2(1 + snr * bf_gain)
 
-    se_optimal   = beam_se(ch, y_test)
-    se_predicted = beam_se(ch, top1_preds)
+    se_optimal   = beam_se(ch_norm, y_test)
+    se_predicted = beam_se(ch_norm, top1_preds)
     se_ratio = np.mean(se_predicted / (se_optimal + 1e-10))
     print(f"[evaluate] SE Ratio: {se_ratio:.4f}")
 

@@ -43,7 +43,7 @@ except Exception:
     experiment = client.create_experiment(name="${EXPERIMENT_NAME}")
     print(f"새 실험 생성: {experiment.experiment_id}")
 
-# 파이프라인 실행
+# 파이프라인 실행 (캐시 비활성화로 최신 컴포넌트 코드 강제 실행)
 run = client.create_run_from_pipeline_package(
     pipeline_file="${PIPELINE_YAML}",
     arguments={
@@ -55,6 +55,7 @@ run = client.create_run_from_pipeline_package(
     },
     run_name="${RUN_NAME}",
     experiment_name="${EXPERIMENT_NAME}",
+    enable_caching=False,
 )
 print(f"실행 시작: run_id={run.run_id}")
 print(f"KFP UI에서 확인: ${KFP_ENDPOINT}/#/runs/details/{run.run_id}")

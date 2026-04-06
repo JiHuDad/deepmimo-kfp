@@ -29,6 +29,10 @@ def deepmimo_pipeline(
     num_subcarriers: int = 512,
     bandwidth: float = 50.0,             # MHz
     num_paths: int = 5,                  # 0 = 전체 경로
+    # DeepMIMO TX/RX set 선택
+    tx_set_id: int = 3,            # BS TX set 인덱스
+    rx_set_id: int = 0,            # UE RX set 인덱스
+    max_users: int = 50000,        # 0 = 전체 사용자 (메모리 주의)
     # 데이터 분할
     train_ratio: float = 0.7,
     val_ratio: float = 0.15,
@@ -61,6 +65,15 @@ def deepmimo_pipeline(
         num_paths=num_paths,
         train_ratio=train_ratio,
         val_ratio=val_ratio,
+        tx_set_id=tx_set_id,
+        rx_set_id=rx_set_id,
+        max_users=max_users,
+    )
+    # 시나리오 데이터를 PVC에서 직접 읽기 위해 마운트 (복사 없음)
+    kubernetes.mount_pvc(
+        preprocess_task,
+        pvc_name="deepmimo-scenarios",
+        mount_path="/data/scenarios",
     )
     preprocess_task.set_cpu_request("2")
     preprocess_task.set_memory_request("4Gi")

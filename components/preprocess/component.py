@@ -26,6 +26,9 @@ def preprocess(
     num_paths: int,
     train_ratio: float,
     val_ratio: float,
+    tx_set_id: int,
+    rx_set_id: int,
+    max_users: int,
     output_train: Output[Dataset],
     output_val: Output[Dataset],
     output_test: Output[Dataset],
@@ -36,6 +39,9 @@ def preprocess(
 
     bs_antenna_shape: 쉼표 구분 문자열, 예: "8,1" → [8, 1]
     num_paths: 0 이면 전체 경로 사용 (None)
+    tx_set_id: 사용할 TX set 인덱스 (BS)
+    rx_set_id: 사용할 RX set 인덱스 (UE)
+    max_users: 0 이면 전체 사용자 (메모리 이슈 시 제한)
     """
     import os
 
@@ -43,13 +49,31 @@ def preprocess(
     import numpy as np
 
     # ── DeepMIMO 데이터셋 로드 ──────────────────────────────
-    dataset_folder = scenario_dataset.path
-    print(f"[preprocess] 시나리오 로드: {scenario_name} ← {dataset_folder}")
-    print(f"[preprocess] 폴더 내용: {os.listdir(dataset_folder)}")
+    # load_scenario가 기록한 PVC 내 절대 경로를 읽음 (데이터 복사 없음)
+    with open(scenario_dataset.path) as f:
+        scen_abs_path = f.read().strip()
+    print(f"[preprocess] 시나리오 경로: {scen_abs_path}")
+    print(f"[preprocess] 폴더 내용: {os.listdir(scen_abs_path)[:10]}")
 
-    dataset = dm.load(scenario_name, dataset_folder=dataset_folder)
-    print(f"[preprocess] 로드 완료. 사용자 수: {dataset.num_users}")
-    dataset.info()
+    # dm.load()는 내부에서 scen_name.lower()를 수행하므로
+    # Linux 대소문자 구분 파일시스템에서 O1_60 ≠ o1_60 문제 발생.
+    # /tmp에 소문자 심볼릭 링크를 생성하여 우회한다.
+    scenarios_tmp = "/tmp/dm_scenarios"
+    os.makedirs(scenarios_tmp, exist_ok=True)
+    symlink_path = os.path.join(scenarios_tmp, scenario_name.lower())
+    if not os.path.exists(symlink_path):
+        os.symlink(scen_abs_path, symlink_path)
+    dm.config.set("scenarios_folder", scenarios_tmp)
+    # rx_sets에 실제 인덱스 범위를 전달해 메모리 절약
+    # max_users>0 이면 첫 max_users 명의 UE만 로드
+    rx_indices = list(range(max_users)) if max_users > 0 else "all"
+    dataset = dm.load(
+        scenario_name,
+        tx_sets={tx_set_id: "all"},
+        rx_sets={rx_set_id: rx_indices},
+        max_paths=num_paths if num_paths > 0 else 10,
+    )
+    print(f"[preprocess] 로드 완료")
 
     # ── 채널 파라미터 설정 (ChannelParameters) ──────────────
     params = dm.ChannelParameters()
@@ -78,6 +102,21 @@ def preprocess(
 
     n_users = channels.shape[0]
     n_tx = channels.shape[2]  # BS 안테나 수
+    # 채널이 0인 사용자(경로 없음) 제거
+    ch_pow = np.abs(channels[:, 0, :, 0]).sum(axis=1)  # (N,) 첫 서브캐리어 전력 합
+    valid_mask = ch_pow > 0
+    n_valid = valid_mask.sum()
+    print(f"[preprocess] 유효 사용자 수: {n_valid}/{n_users}")
+    if n_valid < n_users:
+        channels = channels[valid_mask]
+        n_users = n_valid
+
+    # 메모리 제한 시 사용자 수 축소
+    if max_users > 0 and n_users > max_users:
+        idx_sub = np.random.permutation(n_users)[:max_users]
+        channels = channels[idx_sub]
+        n_users = max_users
+        print(f"[preprocess] 사용자 수 축소: {n_users}")
 
     # ── 빔 선택 레이블 생성 ───────────────────────────────────
     # 첫 번째 서브캐리어 기준, UE 안테나 0번 기준으로 최적 BS 빔 인덱스 결정

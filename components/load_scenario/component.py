@@ -1,9 +1,8 @@
 """
 load_scenario 컴포넌트
 
-폐쇄망 환경에서 사전 적재된 PVC로부터 DeepMIMO 시나리오 파일을 복사한다.
-온라인 환경이라면 DeepMIMO.download_scenario()를 사용할 수 있지만,
-여기서는 /data/scenarios PVC 마운트 경로에서 로컬 복사 방식을 사용한다.
+폐쇄망 환경에서 사전 적재된 PVC의 시나리오 경로를 검증하고
+절대 경로를 아티팩트로 전달한다. 데이터를 복사하지 않으므로 디스크를 낭비하지 않는다.
 """
 
 from kfp import dsl
@@ -19,24 +18,25 @@ def load_scenario(
     scenario_source_path: str,
     output_scenario: Output[Dataset],
 ) -> None:
-    """PVC에서 시나리오 폴더를 아티팩트 경로로 복사."""
+    """PVC 마운트 경로에서 시나리오 존재를 확인하고 절대 경로를 아티팩트에 기록."""
     import os
-    import shutil
 
     src = os.path.join(scenario_source_path, scenario_name)
-    dst = output_scenario.path
 
-    if not os.path.exists(src):
+    if not os.path.isdir(src):
         raise FileNotFoundError(
             f"시나리오 '{scenario_name}'를 '{src}'에서 찾을 수 없습니다. "
             f"PVC에 시나리오 데이터가 적재되어 있는지 확인하세요."
         )
 
-    os.makedirs(dst, exist_ok=True)
-    shutil.copytree(src, dst, dirs_exist_ok=True)
+    file_count = len(os.listdir(src))
+    print(f"[load_scenario] '{scenario_name}' 확인 완료: {src} ({file_count}개 파일)")
 
-    copied = os.listdir(dst)
-    print(f"[load_scenario] '{scenario_name}' 복사 완료 → {dst}")
-    print(f"[load_scenario] 파일 목록: {copied}")
+    # 절대 경로를 텍스트 파일로 저장 (데이터 복사 없음)
+    os.makedirs(os.path.dirname(output_scenario.path), exist_ok=True)
+    with open(output_scenario.path, "w") as f:
+        f.write(src)
+
     output_scenario.metadata["scenario_name"] = scenario_name
-    output_scenario.metadata["file_count"] = len(copied)
+    output_scenario.metadata["scenario_path"] = src
+    output_scenario.metadata["file_count"] = file_count
