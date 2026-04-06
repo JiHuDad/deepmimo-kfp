@@ -93,10 +93,17 @@ for scenario in "${SCENARIO_LIST[@]}"; do
         continue
     fi
     echo "[INFO] '${scenario}' 다운로드 중..."
+    # dm.download은 output_dir 하위에 deepmimo_scenarios/<name>/ 으로 저장됨
     "${PYTHON}" - <<PYEOF
-import deepmimo as dm
+import deepmimo as dm, os, shutil
 dm.download('${scenario}', output_dir='${SCENARIOS_DIR}')
-print('[OK] ${scenario} 다운로드 완료 → ${SCENARIOS_DIR}')
+# deepmimo_scenarios/<name> → <SCENARIOS_DIR>/<name> 으로 이동
+inner = os.path.join('${SCENARIOS_DIR}', 'deepmimo_scenarios', '${scenario}')
+dest  = os.path.join('${SCENARIOS_DIR}', '${scenario}')
+if os.path.exists(inner):
+    shutil.move(inner, dest)
+    shutil.rmtree(os.path.join('${SCENARIOS_DIR}', 'deepmimo_scenarios'), ignore_errors=True)
+print('[OK] ${scenario} → ' + dest)
 PYEOF
 done
 
