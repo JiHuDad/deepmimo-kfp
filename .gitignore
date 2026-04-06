@@ -20,6 +20,7 @@ offline-packages/*.whl
 # 시나리오 데이터 (용량이 크므로 git에서 제외)
 scenarios/
 offline-packages/scenarios/
+deepmimo_scenarios/
 *.mat
 
 # 모델 체크포인트
