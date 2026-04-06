@@ -79,7 +79,7 @@ cat <<'EOF'
   deepmimo.net 에서 O1_60 시나리오를 수동으로 다운로드하세요:
   - URL: https://deepmimo.net/scenarios/o1-scenario/
   - 다운로드 후 압축 해제하여 USB에 포함
-  - 폐쇄망 서버의 /home/fall/data/deepmimo-scenarios/O1_60/ 에 배치
+  - 폐쇄망 서버의 ~/data/deepmimo-scenarios/O1_60/ 에 배치 (기본값)
 EOF
 
 echo ""

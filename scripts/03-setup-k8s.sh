@@ -28,7 +28,7 @@ for pvc in deepmimo-scenarios deepmimo-artifacts; do
 done
 
 # ── 시나리오 데이터 적재 ───────────────────────────────────
-SCENARIO_HOST_PATH="/home/fall/data/deepmimo-scenarios"
+SCENARIO_HOST_PATH="${SCENARIO_HOST_PATH:-${HOME}/data/deepmimo-scenarios}"
 if [[ ! -d "${SCENARIO_HOST_PATH}" ]]; then
     log_error "시나리오 데이터 경로가 없습니다: ${SCENARIO_HOST_PATH}"
     log_error "deepmimo.net에서 O1_60 시나리오를 다운로드하여 아래 경로에 배치하세요:"
@@ -37,7 +37,9 @@ if [[ ! -d "${SCENARIO_HOST_PATH}" ]]; then
 fi
 
 log_info "시나리오 데이터를 PVC에 적재하는 Job 실행 중..."
-kubectl apply -f k8s/load-scenario-job.yaml -n "${NAMESPACE}"
+# YAML의 플레이스홀더를 실제 경로로 치환하여 적용
+sed "s|SCENARIO_HOST_PATH_PLACEHOLDER|${SCENARIO_HOST_PATH}|g" \
+    k8s/load-scenario-job.yaml | kubectl apply -f - -n "${NAMESPACE}"
 
 log_info "Job 완료 대기 중 (최대 5분)..."
 kubectl wait job/deepmimo-load-scenarios \
