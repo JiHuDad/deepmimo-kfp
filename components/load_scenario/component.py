@@ -5,12 +5,15 @@ load_scenario 컴포넌트
 절대 경로를 아티팩트로 전달한다. 데이터를 복사하지 않으므로 디스크를 낭비하지 않는다.
 """
 
+import os
+
 from kfp import dsl
 from kfp.dsl import Output, Dataset
 
+_IMAGE_TAG = os.environ.get("IMAGE_TAG", "latest")
 
 @dsl.component(
-    base_image="localhost:5000/deepmimo-base:latest",
+    base_image=f"localhost:5000/deepmimo-base:{_IMAGE_TAG}",
     packages_to_install=[],
 )
 def load_scenario(

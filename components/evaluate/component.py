@@ -7,12 +7,15 @@ evaluate 컴포넌트
 - 학습 곡선 플롯 생성
 """
 
+import os
+
 from kfp import dsl
 from kfp.dsl import Input, Output, Dataset, Model, Metrics, ClassificationMetrics
 
+_IMAGE_TAG = os.environ.get("IMAGE_TAG", "latest")
 
 @dsl.component(
-    base_image="localhost:5000/deepmimo-trainer:latest",
+    base_image=f"localhost:5000/deepmimo-trainer:{_IMAGE_TAG}",
     packages_to_install=[],
 )
 def evaluate(

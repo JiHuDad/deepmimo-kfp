@@ -6,12 +6,15 @@ DeepMIMO 채널 데이터를 이용한 빔 선택(Beam Selection) MLP 모델 학
 - 출력: 최적 빔 인덱스 (분류 문제)
 """
 
+import os
+
 from kfp import dsl
 from kfp.dsl import Input, Output, Dataset, Model, Metrics
 
+_IMAGE_TAG = os.environ.get("IMAGE_TAG", "latest")
 
 @dsl.component(
-    base_image="localhost:5000/deepmimo-trainer:latest",
+    base_image=f"localhost:5000/deepmimo-trainer:{_IMAGE_TAG}",
     packages_to_install=[],
 )
 def train(

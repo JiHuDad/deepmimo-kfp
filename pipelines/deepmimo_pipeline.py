@@ -28,7 +28,7 @@ def deepmimo_pipeline(
     bs_antenna_shape: str = "8,1",       # BS 안테나 배열 (n_h, n_v)
     num_subcarriers: int = 512,
     bandwidth: float = 50.0,             # MHz
-    num_paths: int = 5,                  # 0 = 전체 경로
+    num_paths: int = 5,                  # 로드할 최대 경로 수 (0 = DeepMIMO 기본값 10)
     # DeepMIMO TX/RX set 선택
     tx_set_id: int = 3,            # BS TX set 인덱스
     rx_set_id: int = 0,            # UE RX set 인덱스
@@ -36,6 +36,7 @@ def deepmimo_pipeline(
     # 데이터 분할
     train_ratio: float = 0.7,
     val_ratio: float = 0.15,
+    random_seed: int = 42,         # 데이터 분할 재현성
     # 학습 하이퍼파라미터
     num_epochs: int = 50,
     learning_rate: float = 1e-3,
@@ -68,6 +69,7 @@ def deepmimo_pipeline(
         tx_set_id=tx_set_id,
         rx_set_id=rx_set_id,
         max_users=max_users,
+        random_seed=random_seed,
     )
     # 시나리오 데이터를 PVC에서 직접 읽기 위해 마운트 (복사 없음)
     kubernetes.mount_pvc(

@@ -9,12 +9,15 @@ DeepMIMO v4 워크플로우:
 채널 데이터를 생성하고 train/val/test 로 분리한다.
 """
 
+import os
+
 from kfp import dsl
 from kfp.dsl import Input, Output, Dataset, Metrics
 
+_IMAGE_TAG = os.environ.get("IMAGE_TAG", "latest")
 
 @dsl.component(
-    base_image="localhost:5000/deepmimo-base:latest",
+    base_image=f"localhost:5000/deepmimo-base:{_IMAGE_TAG}",
     packages_to_install=[],
 )
 def preprocess(
@@ -29,6 +32,7 @@ def preprocess(
     tx_set_id: int,
     rx_set_id: int,
     max_users: int,
+    random_seed: int,
     output_train: Output[Dataset],
     output_val: Output[Dataset],
     output_test: Output[Dataset],
@@ -38,7 +42,7 @@ def preprocess(
     DeepMIMO v4 채널 생성 및 train/val/test 분리.
 
     bs_antenna_shape: 쉼표 구분 문자열, 예: "8,1" → [8, 1]
-    num_paths: 0 이면 전체 경로 사용 (None)
+    num_paths: 로드할 최대 경로 수. 0 이면 DeepMIMO 기본값(10) 사용
     tx_set_id: 사용할 TX set 인덱스 (BS)
     rx_set_id: 사용할 RX set 인덱스 (UE)
     max_users: 0 이면 전체 사용자 (메모리 이슈 시 제한)
@@ -131,7 +135,8 @@ def preprocess(
     print(f"[preprocess] features: {features.shape}, labels: {labels.shape}, classes: {labels.max()+1}")
 
     # ── train / val / test 분리 ──────────────────────────────
-    idx = np.random.permutation(n_users)
+    rng = np.random.default_rng(random_seed)
+    idx = rng.permutation(n_users)
     n_train = int(n_users * train_ratio)
     n_val   = int(n_users * val_ratio)
 

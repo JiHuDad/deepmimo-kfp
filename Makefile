@@ -1,7 +1,7 @@
 # DeepMIMO + Kubeflow Pipelines 프로젝트
 # 사용법: make <target>
 
-.PHONY: help build push setup compile run all clean
+.PHONY: help build push setup compile run all clean clean-k8s
 
 REGISTRY     := localhost:5000
 IMAGE_TAG    ?= latest
@@ -30,10 +30,7 @@ build: ## Docker 이미지 빌드 및 push
 	@bash scripts/01-build-push-images.sh
 
 # ── Kubernetes 설정 ───────────────────────────────────────
-setup: ## PVC 생성 (시나리오 데이터가 있으면 자동 적재)
-	@bash scripts/03-setup-k8s.sh
-
-load-scenarios: ## 시나리오 데이터를 PVC에 적재 (데이터 준비 후 실행)
+setup: ## hostPath PV/PVC 생성 (시나리오 데이터는 PVC에 직접 마운트됨, 복사 없음)
 	@bash scripts/03-setup-k8s.sh
 
 # ── 파이프라인 ────────────────────────────────────────────
@@ -44,7 +41,7 @@ run: ## 파이프라인 컴파일 및 KFP 실행
 	@bash scripts/04-compile-and-run.sh
 
 # ── 전체 실행 순서 ────────────────────────────────────────
-all: install-sdk build setup run ## 전체 파이프라인 실행 (SDK 설치 → 이미지 빌드 → K8s 설정 → 실행)
+all: install-sdk build setup run ## 전체 실행 (SDK 설치 → 이미지 빌드 → hostPath PVC 생성 → 파이프라인 실행)
 
 # ── 정리 ──────────────────────────────────────────────────
 clean: ## 컴파일된 YAML 및 임시 파일 정리
@@ -52,7 +49,7 @@ clean: ## 컴파일된 YAML 및 임시 파일 정리
 	@find . -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@echo "정리 완료."
 
-clean-k8s: ## Kubernetes 리소스 삭제 (PVC 포함 — 데이터 삭제됨!)
+clean-k8s: ## Kubernetes PV/PVC 삭제 (시나리오 원본 데이터는 삭제되지 않음)
 	@kubectl delete pvc deepmimo-scenarios deepmimo-artifacts -n kubeflow --ignore-not-found
-	@kubectl delete job deepmimo-load-scenarios -n kubeflow --ignore-not-found
+	@kubectl delete pv deepmimo-scenarios-pv --ignore-not-found
 	@echo "K8s 리소스 삭제 완료."
