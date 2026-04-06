@@ -68,27 +68,27 @@ make setup
 
 - k3s 및 Kubeflow Pipelines v2 설치 완료
 - `localhost:5000` 로컬 Docker 레지스트리 실행 중
-- 인터넷이 되는 별도 머신에서 오프라인 패키지 수집 완료
 
-### Step 1: 오프라인 패키지 수집 (온라인 머신에서)
+### Step 1: 패키지 및 시나리오 수집 (인터넷 되는 머신에서)
 
 ```bash
-bash offline-packages/collect.sh
-# 결과물을 USB로 이 서버에 복사
+make collect
+# pip 패키지(whl), Docker 이미지, DeepMIMO 시나리오를 자동으로 수집
+# → offline-packages/wheels/
+# → offline-packages/python-3.12-slim.tar
+# → offline-packages/scenarios/O1_60/
 ```
+
+수집 완료 후 `offline-packages/` 전체를 USB로 폐쇄망 서버에 복사.
 
 ### Step 2: 환경 설정 (폐쇄망 서버에서)
 
 ```bash
-# KFP SDK 설치
-make install-sdk
-
-# Docker 이미지 빌드 및 push
-make build
-
-# PVC 생성 및 시나리오 데이터 적재
-# (먼저 ~/data/deepmimo-scenarios/O1_60/ 에 시나리오 파일 배치)
-make setup
+make install-sdk       # 가상환경 생성 + KFP SDK 설치
+make copy-scenarios    # USB의 시나리오 → ~/data/deepmimo-scenarios/
+make build             # Docker 이미지 빌드 및 push
+make setup             # PVC 생성
+make load-scenarios    # 시나리오 데이터 → PVC 적재
 ```
 
 ### Step 3: 파이프라인 실행
