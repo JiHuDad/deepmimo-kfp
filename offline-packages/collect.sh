@@ -17,14 +17,12 @@ mkdir -p "${WHEELS_DIR}"
 
 echo "=== [1/3] Python 패키지 (whl) 수집 ==="
 
-# pip 규칙: --platform/--python-version 사용 시 반드시 --only-binary :all: 이어야 함.
-# 따라서 패키지를 세 그룹으로 분리:
-#   [A] pure-python 패키지 → 플랫폼 제약 없이 --prefer-binary
-#   [B] C 확장 패키지    → --platform linux_x86_64 --only-binary :all:
-#   [C] PyTorch         → pytorch whl index + --only-binary :all:
+# 이 스크립트는 타겟 서버(Ubuntu 24.04 x86_64 Python 3.12)에서 직접 실행한다.
+# 따라서 --platform/--python-version 지정 없이 현재 환경에 맞는 whl을 자동으로 받는다.
+# pip는 실행 환경의 Python 버전과 플랫폼(manylinux 태그 포함)을 자동 감지한다.
 
-# [A] pure-python: kfp, kfp-kubernetes, DeepMIMO (바이너리 없어도 sdist OK)
-echo "[A] KFP SDK + DeepMIMO (pure-python, 플랫폼 제약 없음)"
+# [A] KFP SDK + DeepMIMO
+echo "[A] KFP SDK + DeepMIMO"
 pip download \
     kfp==2.15.0 \
     kfp-kubernetes \
@@ -32,8 +30,8 @@ pip download \
     --dest "${WHEELS_DIR}" \
     --prefer-binary
 
-# [B] C 확장 패키지: linux_x86_64 바이너리만 허용
-echo "[B] numpy/scipy/matplotlib/h5py/scikit-learn (linux_x86_64 바이너리)"
+# [B] 과학 계산 스택 (numpy, scipy 등 C 확장 포함)
+echo "[B] numpy / scipy / matplotlib / h5py / scikit-learn"
 pip download \
     "numpy>=1.24,<2.0" \
     "scipy>=1.11" \
@@ -41,20 +39,16 @@ pip download \
     "h5py>=3.9" \
     "scikit-learn>=1.3" \
     --dest "${WHEELS_DIR}" \
-    --python-version 3.12 \
-    --platform linux_x86_64 \
-    --only-binary :all:
+    --prefer-binary
 
 # [C] PyTorch CPU-only (용량 주의: ~700MB)
-echo "[C] PyTorch CPU (linux_x86_64 바이너리)"
+echo "[C] PyTorch CPU"
 pip download \
     torch==2.2.2+cpu \
     torchvision==0.17.2+cpu \
     --dest "${WHEELS_DIR}" \
     --index-url https://download.pytorch.org/whl/cpu \
-    --python-version 3.12 \
-    --platform linux_x86_64 \
-    --only-binary :all:
+    --prefer-binary
 
 echo "whl 파일 수: $(ls "${WHEELS_DIR}" | wc -l)"
 
