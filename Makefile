@@ -26,7 +26,10 @@ build: ## Docker 이미지 빌드 및 push
 	@bash scripts/01-build-push-images.sh
 
 # ── Kubernetes 설정 ───────────────────────────────────────
-setup: ## PVC 생성 및 시나리오 데이터 적재
+setup: ## PVC 생성 (시나리오 데이터가 있으면 자동 적재)
+	@bash scripts/03-setup-k8s.sh
+
+load-scenarios: ## 시나리오 데이터를 PVC에 적재 (데이터 준비 후 실행)
 	@bash scripts/03-setup-k8s.sh
 
 # ── 파이프라인 ────────────────────────────────────────────
