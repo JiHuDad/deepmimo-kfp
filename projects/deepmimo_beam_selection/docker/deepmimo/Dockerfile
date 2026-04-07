@@ -11,4 +11,12 @@ RUN pip install --no-index --find-links=/tmp/wheels/ \
     && rm -rf /tmp/wheels/ /tmp/requirements.txt \
     && mkdir -p /data/scenarios
 
+# features/ 모듈을 이미지에 포함
+# preprocess 컴포넌트와 서빙 Transformer 가 동일 코드를 import 한다
+COPY projects/__init__.py                                 /app/projects/__init__.py
+COPY projects/deepmimo_beam_selection/__init__.py         /app/projects/deepmimo_beam_selection/__init__.py
+COPY projects/deepmimo_beam_selection/features/           /app/projects/deepmimo_beam_selection/features/
+
+# /app 을 Python 경로에 추가
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

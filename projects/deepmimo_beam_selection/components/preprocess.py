@@ -7,6 +7,9 @@ DeepMIMO v4 워크플로우:
   dataset.compute_channels(params) → channels  shape: [N, n_rx, n_tx, n_subcarr]
 
 채널 데이터를 생성하고 train/val/test 로 분리한다.
+
+feature 추출 / 레이블 생성은 features/extractor.py 에 위임한다.
+→ 서빙 Transformer(Phase 3)가 동일 모듈을 import 하여 Training-Serving Skew 방지.
 """
 
 import os
@@ -105,12 +108,21 @@ def preprocess(
     # shape: [N_users, n_rx_ant, n_tx_ant, n_subcarriers]
     print(f"[preprocess] 채널 shape: {channels.shape}, dtype: {channels.dtype}")
 
+    # ── feature 추출 / 레이블 생성 (extractor 위임) ─────────────
+    # 서빙 Transformer 도 동일 함수를 사용한다 → Training-Serving Skew 방지
+    from projects.deepmimo_beam_selection.features import (
+        extract_features,
+        extract_labels,
+        filter_valid_users,
+        schema as feature_schema,
+    )
+
     n_users = channels.shape[0]
     n_tx = channels.shape[2]  # BS 안테나 수
+
     # 채널이 0인 사용자(경로 없음) 제거
-    ch_pow = np.abs(channels[:, 0, :, 0]).sum(axis=1)  # (N,) 첫 서브캐리어 전력 합
-    valid_mask = ch_pow > 0
-    n_valid = valid_mask.sum()
+    valid_mask = filter_valid_users(channels)
+    n_valid = int(valid_mask.sum())
     print(f"[preprocess] 유효 사용자 수: {n_valid}/{n_users}")
     if n_valid < n_users:
         channels = channels[valid_mask]
@@ -123,15 +135,8 @@ def preprocess(
         n_users = max_users
         print(f"[preprocess] 사용자 수 축소: {n_users}")
 
-    # ── 빔 선택 레이블 생성 ───────────────────────────────────
-    # 첫 번째 서브캐리어 기준, UE 안테나 0번 기준으로 최적 BS 빔 인덱스 결정
-    ch_first = channels[:, 0, :, 0]  # (N_users, n_tx) — 첫 서브캐리어
-    labels = np.argmax(np.abs(ch_first) ** 2, axis=1).astype(np.int64)  # (N_users,)
-
-    # ── 특징 벡터: 첫 서브캐리어의 real/imag concat ──────────
-    features = np.concatenate(
-        [np.real(ch_first), np.imag(ch_first)], axis=1
-    ).astype(np.float32)  # (N_users, n_tx * 2)
+    features = extract_features(channels)   # (N, 2 * n_tx), float32
+    labels   = extract_labels(channels)     # (N,), int64
 
     print(f"[preprocess] features: {features.shape}, labels: {labels.shape}, classes: {labels.max()+1}")
 
@@ -154,11 +159,12 @@ def preprocess(
     _save(output_test,  idx[n_train+n_val:],       "test")
 
     # ── KFP 메트릭 ───────────────────────────────────────────
-    output_metrics.log_metric("total_users",   n_users)
-    output_metrics.log_metric("n_train",       n_train)
-    output_metrics.log_metric("n_val",         n_val)
-    output_metrics.log_metric("n_test",        n_users - n_train - n_val)
-    output_metrics.log_metric("n_bs_antennas", n_tx)
-    output_metrics.log_metric("n_subcarriers", num_subcarriers)
-    output_metrics.log_metric("feature_dim",   features.shape[1])
-    output_metrics.log_metric("num_classes",   int(labels.max()) + 1)
+    output_metrics.log_metric("total_users",            n_users)
+    output_metrics.log_metric("n_train",                n_train)
+    output_metrics.log_metric("n_val",                  n_val)
+    output_metrics.log_metric("n_test",                 n_users - n_train - n_val)
+    output_metrics.log_metric("n_bs_antennas",          n_tx)
+    output_metrics.log_metric("n_subcarriers",          num_subcarriers)
+    output_metrics.log_metric("feature_dim",            features.shape[1])
+    output_metrics.log_metric("num_classes",            int(labels.max()) + 1)
+    output_metrics.log_metric("feature_schema_version", feature_schema()["version"])
