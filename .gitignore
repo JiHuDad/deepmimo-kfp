@@ -10,6 +10,7 @@ env/
 
 # 컴파일된 파이프라인 (재생성 가능)
 *.yaml
+!platform/k8s/*.yaml
 !k8s/*.yaml
 
 # 오프라인 패키지 (용량이 크므로 git에서 제외)

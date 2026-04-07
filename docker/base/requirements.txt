@@ -1,5 +1,0 @@
-DeepMIMO==4.0.0
-numpy>=1.24,<2.0
-scipy>=1.11
-matplotlib>=3.7
-h5py>=3.9

@@ -1,18 +1,68 @@
-# deepmimo-kfp
+# MLOps KFP Platform
 
-DeepMIMO 레이트레이싱 채널 데이터를 이용한 빔 선택 모델 학습 파이프라인.
-폐쇄망(Air-gapped) Ubuntu 24.04 + k3s + Kubeflow Pipelines v2 환경 기준.
+폐쇄망(Air-gapped) Ubuntu 24.04 + k3s + Kubeflow Pipelines v2 기반 MLOps 플랫폼.
+범용 컴포넌트(데이터 검증, 학습, 평가)를 제공하며, 프로젝트별 도메인 로직은 분리하여 관리한다.
 
-## 파이프라인 개요
+## 디렉토리 구조
 
 ```
-[load_scenario]  ← deepmimo-scenarios PVC (hostPath, 복사 없음)
-       ↓            경로 검증 후 절대 경로를 아티팩트로 전달
-[preprocess]     — DeepMIMO v4 dm.load() + compute_channels() → features/labels/channel.npy
+deepmimo-kfp/                        ← 저장소 루트
+├── mlops_platform/                    ← MLOps 플랫폼 (범용 인프라)
+│   ├── lib/mlops_lib/                ← 범용 Python 라이브러리
+│   │   ├── components/               ← KFP v2 범용 컴포넌트
+│   │   │   ├── validate_data.py      │  PVC 경로 검증
+│   │   │   ├── train_classifier.py   │  MLP 분류 모델 학습
+│   │   │   └── evaluate_classifier.py│  Top-1/3 정확도, 학습 곡선
+│   │   └── pipeline_helpers.py       ← PVC 마운트 등 유틸리티
+│   ├── base-images/                  ← Docker 베이스 이미지
+│   │   ├── python-cpu/               │  numpy/scipy/matplotlib
+│   │   └── pytorch-cpu/              │  + PyTorch CPU
+│   ├── k8s/                          ← K8s 매니페스트 템플릿
+│   │   ├── pv-data.yaml              │  hostPath PV/PVC (범용)
+│   │   └── pvc-artifacts.yaml        │  학습 아티팩트 PVC
+│   └── scripts/                      ← 플랫폼 운영 스크립트
+│       ├── lib/common.sh             │  공통 변수/함수
+│       ├── build-base-images.sh      │  python-cpu, pytorch-cpu 빌드
+│       ├── install-kfp-sdk.sh        │  KFP SDK 오프라인 설치
+│       ├── copy-scenarios.sh         │  시나리오 복사
+│       └── setup-k8s.sh              │  플랫폼 K8s 리소스 생성
+├── projects/                         ← 프로젝트별 도메인 로직
+│   └── deepmimo_beam_selection/      ← DeepMIMO 빔 선택 프로젝트
+│       ├── components/               ← 프로젝트 전용 컴포넌트
+│       │   ├── preprocess.py         │  DeepMIMO v4 채널 생성
+│       │   └── evaluate_se.py        │  Spectral Efficiency 평가
+│       ├── pipeline.py               ← 파이프라인 정의
+│       ├── compile.py                ← YAML 컴파일
+│       ├── docker/deepmimo/          ← 프로젝트 전용 이미지
+│       └── scripts/                  ← 프로젝트 빌드/실행 스크립트
+├── offline-packages/                 ← 폐쇄망 패키지 수집
+│   └── collect.sh
+├── Makefile                          ← 통합 빌드/실행 진입점
+└── README.md
+```
+
+## 플랫폼 vs 프로젝트 분리
+
+| 구분 | 플랫폼 (`mlops_platform/`) | 프로젝트 (`projects/`) |
+|------|----------------------|----------------------|
+| 역할 | 범용 MLOps 인프라 | 도메인 특화 로직 |
+| 컴포넌트 | validate_data, train_classifier, evaluate_classifier | preprocess, evaluate_se |
+| Docker 이미지 | python-cpu, pytorch-cpu | deepmimo (DeepMIMO 포함) |
+| K8s 리소스 | artifacts PVC, PV 템플릿 | 시나리오 PV/PVC |
+| 재사용 | 모든 프로젝트 공통 | 프로젝트별 고유 |
+
+## 파이프라인 개요 (DeepMIMO 빔 선택)
+
+```
+[validate_data]  ← 플랫폼 범용: PVC 경로 검증
        ↓
-[train]          — MLP Beam Selection (PyTorch) → best_model.pt
+[preprocess]     ← 프로젝트 전용: DeepMIMO v4 채널 생성 → features/labels
        ↓
-[evaluate]       — Top-1/3 정확도, Spectral Efficiency → KFP UI 메트릭
+[train_classifier] ← 플랫폼 범용: MLP 학습 → best_model.pt
+       ↓
+[evaluate_classifier] ← 플랫폼 범용: Top-1/3 정확도, 학습 곡선
+       ↓
+[evaluate_se]    ← 프로젝트 전용: DFT 빔포밍 SE 비율
 ```
 
 시나리오 데이터는 **복사하지 않습니다.**
@@ -91,8 +141,8 @@ make collect
 ```bash
 make install-sdk       # 가상환경 생성 + KFP SDK 설치
 make copy-scenarios    # USB의 시나리오 → ~/data/deepmimo-scenarios/
-make build             # Docker 이미지 빌드 및 push
-make setup             # hostPath PV/PVC 생성 (데이터 복사 없음)
+make build             # Docker 이미지 빌드 및 push (플랫폼 + 프로젝트)
+make setup             # K8s PV/PVC 생성 (데이터 복사 없음)
 ```
 
 ### Step 3: 파이프라인 실행
@@ -112,28 +162,6 @@ KFP UI는 `kubectl port-forward`로 접근:
 ```bash
 kubectl port-forward -n kubeflow svc/ml-pipeline-ui 8080:80
 # 브라우저에서 http://localhost:8080
-```
-
----
-
-## 디렉토리 구조
-
-```
-deepmimo-kfp/
-├── docker/              # Docker 이미지 정의
-│   ├── base/            # DeepMIMO + numpy/scipy
-│   └── trainer/         # base + PyTorch
-├── components/          # KFP v2 컴포넌트
-│   ├── load_scenario/   # PVC 경로 검증 및 아티팩트 전달
-│   ├── preprocess/      # DeepMIMO 채널 생성 및 분할
-│   ├── train/           # MLP 학습
-│   └── evaluate/        # 성능 평가
-├── pipelines/           # 파이프라인 정의 및 컴파일
-├── k8s/                 # PV/PVC 매니페스트
-│   ├── pv-scenarios.yaml    # hostPath PV + PVC (시나리오, 읽기전용)
-│   └── pvc-artifacts.yaml   # 학습 아티팩트 PVC
-├── scripts/             # 운영 자동화 스크립트
-└── offline-packages/    # 폐쇄망 패키지 수집 스크립트
 ```
 
 ---
@@ -179,9 +207,28 @@ make run
 
 ---
 
+## 새 프로젝트 추가 방법
+
+1. `projects/my_new_project/` 디렉토리 생성
+2. 도메인 전용 컴포넌트를 `components/`에 작성
+3. `pipeline.py`에서 플랫폼 컴포넌트 + 프로젝트 컴포넌트를 조합
+4. 필요 시 프로젝트 전용 Docker 이미지를 `docker/`에 정의
+5. `scripts/`에 빌드/실행 스크립트 작성
+6. 루트 Makefile에 프로젝트 타겟 추가
+
+```python
+# pipeline.py 예시
+from mlops_platform.lib.mlops_lib.components import validate_data, train_classifier, evaluate_classifier
+from projects.my_new_project.components import my_preprocess
+```
+
+---
+
 ## 알려진 제약
 
 - **tx/rx set 인덱스**: O1_60 시나리오에서 BS는 TX set 3, UE는 RX set 0이 일반적입니다.
   다른 시나리오를 사용할 경우 `tx_set_id`/`rx_set_id`를 확인 후 조정하세요.
 - **KFP UI NodePort**: 환경에 따라 NodePort(31380)가 비활성화되어 있을 수 있습니다.
   `kubectl port-forward`를 통해 접근하세요.
+- **디렉토리 이름**: `mlops_platform` 디렉토리는 Python `platform` 표준 모듈과의
+  충돌을 피하기 위해 접두사 `mlops_`를 사용합니다.

@@ -1,15 +1,14 @@
-# DeepMIMO + Kubeflow Pipelines 프로젝트
+# MLOps 플랫폼 + DeepMIMO 프로젝트
 # 사용법: make <target>
 
-.PHONY: help build push setup compile run all clean clean-k8s
+.PHONY: help collect copy-scenarios install-sdk \
+        build-platform build-project build setup-platform setup-project setup \
+        compile run all clean clean-k8s
 
 REGISTRY     := localhost:5000
 IMAGE_TAG    ?= latest
-KFP_UI       := http://192.168.1.112:31380
-# KFP API는 ClusterIP라 port-forward 필요 → scripts/04-compile-and-run.sh에서 자동 처리
 
 export IMAGE_TAG
-export KFP_ENDPOINT
 
 help: ## 사용 가능한 명령 목록
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -20,28 +19,38 @@ collect: ## [온라인 머신] whl/이미지/시나리오 수집 (offline-packag
 	@bash offline-packages/collect.sh
 
 copy-scenarios: ## USB 복사 후 시나리오를 호스트 경로에 배치
-	@bash scripts/00-copy-scenarios.sh
+	@bash mlops_platform/scripts/copy-scenarios.sh
 
 install-sdk: ## KFP SDK 오프라인 설치
-	@bash scripts/02-install-kfp-sdk.sh
+	@bash mlops_platform/scripts/install-kfp-sdk.sh
 
 # ── Docker 이미지 ─────────────────────────────────────────
-build: ## Docker 이미지 빌드 및 push
-	@bash scripts/01-build-push-images.sh
+build-platform: ## 플랫폼 베이스 이미지 빌드 (python-cpu, pytorch-cpu)
+	@bash mlops_platform/scripts/build-base-images.sh
+
+build-project: ## DeepMIMO 프로젝트 이미지 빌드 (deepmimo)
+	@bash projects/deepmimo_beam_selection/scripts/build-images.sh
+
+build: build-platform build-project ## 전체 Docker 이미지 빌드 (플랫폼 + 프로젝트)
 
 # ── Kubernetes 설정 ───────────────────────────────────────
-setup: ## hostPath PV/PVC 생성 (시나리오 데이터는 PVC에 직접 마운트됨, 복사 없음)
-	@bash scripts/03-setup-k8s.sh
+setup-platform: ## 플랫폼 공용 K8s 리소스 생성
+	@bash mlops_platform/scripts/setup-k8s.sh
+
+setup-project: ## DeepMIMO 프로젝트 K8s 리소스 생성 (시나리오 PV/PVC)
+	@bash projects/deepmimo_beam_selection/scripts/setup-k8s.sh
+
+setup: setup-platform setup-project ## 전체 K8s 리소스 생성
 
 # ── 파이프라인 ────────────────────────────────────────────
 compile: ## 파이프라인 YAML 컴파일
-	@python3 pipelines/compile.py
+	@python3 projects/deepmimo_beam_selection/compile.py
 
 run: ## 파이프라인 컴파일 및 KFP 실행
-	@bash scripts/04-compile-and-run.sh
+	@bash projects/deepmimo_beam_selection/scripts/compile-and-run.sh
 
 # ── 전체 실행 순서 ────────────────────────────────────────
-all: install-sdk build setup run ## 전체 실행 (SDK 설치 → 이미지 빌드 → hostPath PVC 생성 → 파이프라인 실행)
+all: install-sdk build setup run ## 전체 실행 (SDK 설치 → 이미지 빌드 → K8s 설정 → 파이프라인 실행)
 
 # ── 정리 ──────────────────────────────────────────────────
 clean: ## 컴파일된 YAML 및 임시 파일 정리
@@ -50,6 +59,6 @@ clean: ## 컴파일된 YAML 및 임시 파일 정리
 	@echo "정리 완료."
 
 clean-k8s: ## Kubernetes PV/PVC 삭제 (시나리오 원본 데이터는 삭제되지 않음)
-	@kubectl delete pvc deepmimo-scenarios deepmimo-artifacts -n kubeflow --ignore-not-found
+	@kubectl delete pvc deepmimo-scenarios mlops-artifacts -n kubeflow --ignore-not-found
 	@kubectl delete pv deepmimo-scenarios-pv --ignore-not-found
 	@echo "K8s 리소스 삭제 완료."
