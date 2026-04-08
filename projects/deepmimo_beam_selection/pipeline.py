@@ -8,6 +8,17 @@ DeepMIMO v4 API 기반 빔 선택 모델 학습 파이프라인.
   validate_data (플랫폼) → preprocess (프로젝트)
     → train_classifier (플랫폼) → evaluate_classifier (플랫폼)
     → evaluate_se (프로젝트)
+    → [선택] register_model (플랫폼, use_mlflow=True 일 때만 실행)
+
+MLflow 연동 (use_mlflow=True):
+  - train_classifier: 실험 추적, 모델 아티팩트 로깅
+  - register_model:   Model Registry 등록 및 스테이지 승격
+  - ConfigMap(mlflow-config), Secret(mlflow-s3-creds) 는 항상 주입됨
+    (컴포넌트가 use_mlflow=False 이면 환경변수를 무시함)
+
+주의: use_mlflow=True 이면 클러스터에 아래 리소스가 필요합니다.
+  kubectl apply -f mlops_platform/k8s/mlflow/configmap.yaml
+  kubectl apply -f mlops_platform/k8s/mlflow/secret.yaml
 """
 
 import sys
@@ -24,9 +35,30 @@ from mlops_platform.lib.mlops_lib.components import (
     validate_data,
     train_classifier,
     evaluate_classifier,
+    register_model,
 )
 
 from projects.deepmimo_beam_selection.components import preprocess, evaluate_se
+
+
+def _inject_mlflow_env(task):
+    """ConfigMap + Secret 을 태스크 환경변수로 주입한다."""
+    kubernetes.use_config_map_as_env(
+        task,
+        config_map_name="mlflow-config",
+        config_map_key_to_env={
+            "MLFLOW_TRACKING_URI":    "MLFLOW_TRACKING_URI",
+            "MLFLOW_S3_ENDPOINT_URL": "MLFLOW_S3_ENDPOINT_URL",
+        },
+    )
+    kubernetes.use_secret_as_env(
+        task,
+        secret_name="mlflow-s3-creds",
+        secret_key_to_env={
+            "AWS_ACCESS_KEY_ID":     "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY",
+        },
+    )
 
 
 @dsl.pipeline(
@@ -55,6 +87,11 @@ def deepmimo_pipeline(
     learning_rate: float = 1e-3,
     batch_size: int = 256,
     hidden_dims: str = "256,128,64",
+    # MLflow 연동
+    use_mlflow: bool = False,
+    mlflow_experiment_name: str = "deepmimo-beam-selection",
+    mlflow_model_name: str = "beam-selection-mlp",
+    promote_to_stage: str = "",          # "Staging" | "Production" | "" (등록만)
 ) -> None:
 
     # ── Step 1: 데이터 검증 (플랫폼 범용) ───────────────────
@@ -94,6 +131,9 @@ def deepmimo_pipeline(
     preprocess_task.set_display_name("2. 채널 생성 및 분할")
 
     # ── Step 3: 학습 (플랫폼 범용) ───────────────────────────
+    # ConfigMap + Secret 은 항상 주입됨.
+    # use_mlflow=False 이면 컴포넌트 내부에서 환경변수를 무시한다.
+    # (ConfigMap/Secret 이 클러스터에 없으면 Pod 기동 실패 → 아래 setup-mlflow.sh 참조)
     train_task = train_classifier(
         train_dataset=preprocess_task.outputs["output_train"],
         val_dataset=preprocess_task.outputs["output_val"],
@@ -101,7 +141,10 @@ def deepmimo_pipeline(
         learning_rate=learning_rate,
         batch_size=batch_size,
         hidden_dims=hidden_dims,
+        use_mlflow=use_mlflow,
+        mlflow_experiment_name=mlflow_experiment_name,
     )
+    _inject_mlflow_env(train_task)
     train_task.set_cpu_request("4")
     train_task.set_memory_request("8Gi")
     train_task.set_display_name("3. 모델 학습")
@@ -119,3 +162,14 @@ def deepmimo_pipeline(
         predictions=eval_task.outputs["output_predictions"],
     )
     se_task.set_display_name("5. Spectral Efficiency 평가")
+
+    # ── Step 6: Model Registry 등록 (MLflow 옵션) ────────────
+    # use_mlflow=True 일 때만 실행
+    with dsl.If(use_mlflow == True, name="register-if-mlflow"):  # noqa: E712
+        register_task = register_model(
+            trained_model=train_task.outputs["output_model"],
+            model_name=mlflow_model_name,
+            promote_to_stage=promote_to_stage,
+        )
+        _inject_mlflow_env(register_task)
+        register_task.set_display_name("6. 모델 레지스트리 등록")

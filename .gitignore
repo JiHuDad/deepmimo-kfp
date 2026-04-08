@@ -12,6 +12,9 @@ env/
 *.yaml
 !platform/k8s/*.yaml
 !k8s/*.yaml
+!mlops_platform/k8s/**/*.yaml
+# Secret YAML 은 보안상 git 에서 제외 (setup-mlflow.sh 로 직접 생성)
+mlops_platform/k8s/**/secret*.yaml
 
 # 오프라인 패키지 (용량이 크므로 git에서 제외)
 offline-packages/wheels/
