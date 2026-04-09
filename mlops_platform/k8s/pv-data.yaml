@@ -1,0 +1,54 @@
+# 데이터 hostPath PV + PVC 범용 템플릿
+#
+# 직접 사용하지 말고 setup-k8s.sh 를 통해 적용하세요.
+# setup-k8s.sh 가 아래 플레이스홀더를 sed 로 치환한 뒤 kubectl apply 합니다.
+#
+# 플레이스홀더:
+#   DATA_HOST_PATH_PLACEHOLDER  — 호스트 머신의 데이터 절대 경로
+#   NODE_NAME_PLACEHOLDER       — 데이터가 위치한 노드 이름 (nodeAffinity)
+#   DATA_PV_NAME_PLACEHOLDER    — PersistentVolume 이름
+#   DATA_PVC_NAME_PLACEHOLDER   — PersistentVolumeClaim 이름
+#
+# 적용 예시 (직접):
+#   sed -e "s|DATA_HOST_PATH_PLACEHOLDER|/home/user/data/deepmimo-scenarios|g" \
+#       -e "s|NODE_NAME_PLACEHOLDER|my-node|g" \
+#       -e "s|DATA_PV_NAME_PLACEHOLDER|deepmimo-scenarios-pv|g" \
+#       -e "s|DATA_PVC_NAME_PLACEHOLDER|deepmimo-scenarios|g" \
+#       mlops_platform/k8s/pv-data.yaml | kubectl apply -f -
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: DATA_PV_NAME_PLACEHOLDER
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadOnlyMany          # 여러 Pod 동시 읽기 (데이터는 읽기 전용)
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""      # 특정 StorageClass 없이 수동 바인딩
+  hostPath:
+    path: DATA_HOST_PATH_PLACEHOLDER
+    type: Directory
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - NODE_NAME_PLACEHOLDER
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: DATA_PVC_NAME_PLACEHOLDER
+  namespace: kubeflow
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: ""      # 위 PV 와 수동 바인딩
+  volumeName: DATA_PV_NAME_PLACEHOLDER
