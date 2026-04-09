@@ -67,15 +67,15 @@ def _inject_mlflow_env(task):
 )
 def deepmimo_pipeline(
     # 시나리오
-    scenario_name: str = "O1_60",
+    scenario_name: str = "asu_campus_3p5",
     scenario_source_path: str = "/data/scenarios",
     # DeepMIMO v4 채널 파라미터
     bs_antenna_shape: str = "8,1",       # BS 안테나 배열 (n_h, n_v)
     num_subcarriers: int = 512,
-    bandwidth: float = 50.0,             # MHz
+    bandwidth: float = 20.0,             # MHz (asu_campus_3p5: 3.5 GHz 대역)
     num_paths: int = 5,                  # 로드할 최대 경로 수 (0 = DeepMIMO 기본값 10)
     # DeepMIMO TX/RX set 선택
-    tx_set_id: int = 3,            # BS TX set 인덱스
+    tx_set_id: int = 0,            # BS TX set 인덱스 (asu_campus_3p5 기본값)
     rx_set_id: int = 0,            # UE RX set 인덱스
     max_users: int = 50000,        # 0 = 전체 사용자 (메모리 주의)
     # 데이터 분할
@@ -89,8 +89,8 @@ def deepmimo_pipeline(
     hidden_dims: str = "256,128,64",
     # MLflow 연동
     use_mlflow: bool = False,
-    mlflow_experiment_name: str = "deepmimo-beam-selection",
-    mlflow_model_name: str = "beam-selection-mlp",
+    mlflow_experiment_name: str = "asu-campus-beam-selection",
+    mlflow_model_name: str = "asu-campus-beam-selection-mlp",
     promote_to_stage: str = "",          # "Staging" | "Production" | "" (등록만)
 ) -> None:
 

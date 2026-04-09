@@ -88,7 +88,7 @@ echo ""
 echo "=== [3/3] DeepMIMO 시나리오 데이터 다운로드 ==="
 
 SCENARIOS_DIR="${SCRIPT_DIR}/scenarios"
-SCENARIOS="${DEEPMIMO_SCENARIOS:-O1_60}"   # 쉼표 구분으로 여러 개 지정 가능
+SCENARIOS="${DEEPMIMO_SCENARIOS:-asu_campus_3p5}"   # 쉼표 구분으로 여러 개 지정 가능
 
 mkdir -p "${SCENARIOS_DIR}"
 

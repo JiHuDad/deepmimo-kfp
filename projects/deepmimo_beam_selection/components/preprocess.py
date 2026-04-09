@@ -64,7 +64,7 @@ def preprocess(
     print(f"[preprocess] 폴더 내용: {os.listdir(scen_abs_path)[:10]}")
 
     # dm.load()는 내부에서 scen_name.lower()를 수행하므로
-    # Linux 대소문자 구분 파일시스템에서 O1_60 ≠ o1_60 문제 발생.
+    # Linux 대소문자 구분 파일시스템에서 시나리오명 대소문자 불일치 문제가 발생할 수 있음.
     # /tmp에 소문자 심볼릭 링크를 생성하여 우회한다.
     scenarios_tmp = "/tmp/dm_scenarios"
     os.makedirs(scenarios_tmp, exist_ok=True)

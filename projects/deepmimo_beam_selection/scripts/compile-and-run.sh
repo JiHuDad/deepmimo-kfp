@@ -47,7 +47,7 @@ except Exception:
 run = client.create_run_from_pipeline_package(
     pipeline_file="${PIPELINE_YAML}",
     arguments={
-        "scenario_name": "O1_60",
+        "scenario_name": "asu_campus_3p5",
         "num_epochs": 50,
         "learning_rate": 0.001,
         "batch_size": 256,

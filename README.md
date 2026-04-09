@@ -101,10 +101,10 @@ sudo systemctl restart k3s
 
 ### 3. DeepMIMO 시나리오 데이터 배치
 
-deepmimo.net에서 O1_60 시나리오를 다운로드하거나 `make collect`로 자동 수집 후:
+deepmimo.net에서 asu_campus_3p5 시나리오를 다운로드하거나 `make collect`로 자동 수집 후:
 
 ```
-~/data/deepmimo-scenarios/O1_60/
+~/data/deepmimo-scenarios/asu_campus_3p5/
 ```
 
 에 압축 해제. 경로를 바꾸려면 `SCENARIO_HOST_PATH` 환경변수로 지정:
@@ -122,7 +122,7 @@ make setup
 
 - k3s 및 Kubeflow Pipelines v2 설치 완료
 - `localhost:5000` 로컬 Docker 레지스트리 실행 중
-- `~/data/deepmimo-scenarios/O1_60/` 에 시나리오 데이터 존재
+- `~/data/deepmimo-scenarios/asu_campus_3p5/` 에 시나리오 데이터 존재
 
 ### Step 1: 패키지 및 시나리오 수집 (인터넷 되는 머신에서)
 
@@ -131,7 +131,7 @@ make collect
 # pip 패키지(whl), Docker 이미지, DeepMIMO 시나리오를 자동으로 수집
 # → offline-packages/wheels/
 # → offline-packages/python-3.12-slim.tar
-# → offline-packages/scenarios/O1_60/
+# → offline-packages/scenarios/asu_campus_3p5/
 ```
 
 수집 완료 후 `offline-packages/` 전체를 USB로 폐쇄망 서버에 복사.
@@ -188,13 +188,13 @@ make run
 
 | 파라미터 | 기본값 | 설명 |
 |----------|--------|------|
-| `scenario_name` | `O1_60` | DeepMIMO 시나리오 이름 |
+| `scenario_name` | `asu_campus_3p5` | DeepMIMO 시나리오 이름 |
 | `scenario_source_path` | `/data/scenarios` | PVC 내 시나리오 루트 경로 |
 | `bs_antenna_shape` | `8,1` | BS 안테나 배열 형태 (n_h,n_v) |
 | `num_subcarriers` | `512` | OFDM 서브캐리어 수 |
-| `bandwidth` | `50.0` | 대역폭 (MHz) |
+| `bandwidth` | `20.0` | 대역폭 (MHz, asu_campus_3p5: 3.5 GHz 대역) |
 | `num_paths` | `5` | 로드할 최대 경로 수 (0 = DeepMIMO 기본값 10) |
-| `tx_set_id` | `3` | BS TX set 인덱스 |
+| `tx_set_id` | `0` | BS TX set 인덱스 (asu_campus_3p5 기본값) |
 | `rx_set_id` | `0` | UE RX set 인덱스 |
 | `max_users` | `50000` | 사용할 최대 UE 수 (0 = 전체, 메모리 주의) |
 | `train_ratio` | `0.7` | 학습 데이터 비율 |
@@ -226,8 +226,8 @@ from projects.my_new_project.components import my_preprocess
 
 ## 알려진 제약
 
-- **tx/rx set 인덱스**: O1_60 시나리오에서 BS는 TX set 3, UE는 RX set 0이 일반적입니다.
-  다른 시나리오를 사용할 경우 `tx_set_id`/`rx_set_id`를 확인 후 조정하세요.
+- **tx/rx set 인덱스**: asu_campus_3p5 시나리오에서 기본값은 TX set 0, RX set 0입니다.
+  시나리오 변경 시 `tx_set_id`/`rx_set_id`를 DeepMIMO 문서에서 확인 후 조정하세요.
 - **KFP UI NodePort**: 환경에 따라 NodePort(31380)가 비활성화되어 있을 수 있습니다.
   `kubectl port-forward`를 통해 접근하세요.
 - **디렉토리 이름**: `mlops_platform` 디렉토리는 Python `platform` 표준 모듈과의
