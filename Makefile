@@ -3,7 +3,7 @@
 
 .PHONY: help collect copy-scenarios install-sdk \
         build-platform build-project build setup-platform setup-project setup \
-        compile run all clean clean-k8s
+        compile run all clean clean-k8s clean-k8s-force
 
 REGISTRY     := localhost:5000
 IMAGE_TAG    ?= latest
@@ -58,7 +58,8 @@ clean: ## 컴파일된 YAML 및 임시 파일 정리
 	@find . -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@echo "정리 완료."
 
-clean-k8s: ## Kubernetes PV/PVC 삭제 (시나리오 원본 데이터는 삭제되지 않음)
-	@kubectl delete pvc deepmimo-scenarios mlops-artifacts -n kubeflow --ignore-not-found
-	@kubectl delete pv deepmimo-scenarios-pv --ignore-not-found
-	@echo "K8s 리소스 삭제 완료."
+clean-k8s: ## Kubernetes 리소스 전체 정리 (PV/PVC finalizer 강제 제거 포함)
+	@bash mlops_platform/scripts/cleanup-k8s.sh
+
+clean-k8s-force: ## Kubernetes 리소스 전체 정리 (확인 프롬프트 없이)
+	@bash mlops_platform/scripts/cleanup-k8s.sh --force
