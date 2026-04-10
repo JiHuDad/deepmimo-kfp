@@ -68,16 +68,27 @@ echo "[C] PyTorch CPU"
 echo "whl 파일 수: $(ls "${WHEELS_DIR}" | wc -l)"
 
 echo ""
-echo "=== [2/3] Docker 베이스 이미지 저장 ==="
+echo "=== [2/3] Docker 이미지 저장 ==="
+
+# [I-1] python:3.12-slim — 플랫폼 베이스 이미지
 docker pull python:3.12-slim
 docker save python:3.12-slim -o "${SCRIPT_DIR}/python-3.12-slim.tar"
 echo "저장 완료: python-3.12-slim.tar ($(du -sh "${SCRIPT_DIR}/python-3.12-slim.tar" | cut -f1))"
+
+# [I-2] kfp-launcher — KFP v2 파이프라인 스텝 사이드카 (필수)
+# 폐쇄망에서 이 이미지가 없으면 모든 파이프라인 스텝이 ImagePullBackOff 로 실패한다.
+KFP_VERSION="2.15.0"
+KFP_LAUNCHER_IMAGE="gcr.io/ml-pipeline/kfp-launcher:${KFP_VERSION}"
+echo "[I-2] kfp-launcher:${KFP_VERSION}"
+docker pull "${KFP_LAUNCHER_IMAGE}"
+docker save "${KFP_LAUNCHER_IMAGE}" -o "${SCRIPT_DIR}/kfp-launcher-${KFP_VERSION}.tar"
+echo "저장 완료: kfp-launcher-${KFP_VERSION}.tar ($(du -sh "${SCRIPT_DIR}/kfp-launcher-${KFP_VERSION}.tar" | cut -f1))"
 
 echo ""
 echo "=== [3/3] DeepMIMO 시나리오 데이터 다운로드 ==="
 
 SCENARIOS_DIR="${SCRIPT_DIR}/scenarios"
-SCENARIOS="${DEEPMIMO_SCENARIOS:-O1_60}"   # 쉼표 구분으로 여러 개 지정 가능
+SCENARIOS="${DEEPMIMO_SCENARIOS:-asu_campus_3p5}"   # 쉼표 구분으로 여러 개 지정 가능
 
 mkdir -p "${SCENARIOS_DIR}"
 
@@ -112,6 +123,7 @@ echo "시나리오 목록: $(ls "${SCENARIOS_DIR}")"
 echo ""
 echo "=== 수집 완료 ==="
 echo "USB에 복사할 파일:"
-echo "  - offline-packages/wheels/    ($(du -sh "${WHEELS_DIR}" | cut -f1))"
+echo "  - offline-packages/wheels/                     ($(du -sh "${WHEELS_DIR}" | cut -f1))"
 echo "  - offline-packages/python-3.12-slim.tar"
-echo "  - offline-packages/scenarios/ ($(du -sh "${SCENARIOS_DIR}" | cut -f1))"
+echo "  - offline-packages/kfp-launcher-${KFP_VERSION}.tar"
+echo "  - offline-packages/scenarios/                  ($(du -sh "${SCENARIOS_DIR}" | cut -f1))"

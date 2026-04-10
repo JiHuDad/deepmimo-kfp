@@ -2,8 +2,9 @@
 # 사용법: make <target>
 
 .PHONY: help collect copy-scenarios install-sdk \
-        build-platform build-project build setup-platform setup-project setup \
-        compile run all clean clean-k8s
+        build-platform build-project build load-kfp-images \
+        setup-platform setup-project setup \
+        compile run all clean clean-k8s clean-k8s-force
 
 REGISTRY     := localhost:5000
 IMAGE_TAG    ?= latest
@@ -33,6 +34,9 @@ build-project: ## DeepMIMO 프로젝트 이미지 빌드 (deepmimo)
 
 build: build-platform build-project ## 전체 Docker 이미지 빌드 (플랫폼 + 프로젝트)
 
+load-kfp-images: ## KFP 내부 이미지를 k3s containerd 에 로드 (kfp-launcher 등)
+	@bash mlops_platform/scripts/load-kfp-images.sh
+
 # ── Kubernetes 설정 ───────────────────────────────────────
 setup-platform: ## 플랫폼 공용 K8s 리소스 생성
 	@bash mlops_platform/scripts/setup-k8s.sh
@@ -50,7 +54,7 @@ run: ## 파이프라인 컴파일 및 KFP 실행
 	@bash projects/deepmimo_beam_selection/scripts/compile-and-run.sh
 
 # ── 전체 실행 순서 ────────────────────────────────────────
-all: install-sdk build setup run ## 전체 실행 (SDK 설치 → 이미지 빌드 → K8s 설정 → 파이프라인 실행)
+all: install-sdk build load-kfp-images setup run ## 전체 실행 (SDK 설치 → 이미지 빌드 → KFP 이미지 로드 → K8s 설정 → 파이프라인 실행)
 
 # ── 정리 ──────────────────────────────────────────────────
 clean: ## 컴파일된 YAML 및 임시 파일 정리
@@ -58,7 +62,8 @@ clean: ## 컴파일된 YAML 및 임시 파일 정리
 	@find . -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@echo "정리 완료."
 
-clean-k8s: ## Kubernetes PV/PVC 삭제 (시나리오 원본 데이터는 삭제되지 않음)
-	@kubectl delete pvc deepmimo-scenarios mlops-artifacts -n kubeflow --ignore-not-found
-	@kubectl delete pv deepmimo-scenarios-pv --ignore-not-found
-	@echo "K8s 리소스 삭제 완료."
+clean-k8s: ## Kubernetes 리소스 전체 정리 (PV/PVC finalizer 강제 제거 포함)
+	@bash mlops_platform/scripts/cleanup-k8s.sh
+
+clean-k8s-force: ## Kubernetes 리소스 전체 정리 (확인 프롬프트 없이)
+	@bash mlops_platform/scripts/cleanup-k8s.sh --force

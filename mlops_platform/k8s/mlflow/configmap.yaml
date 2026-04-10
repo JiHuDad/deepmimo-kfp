@@ -1,0 +1,17 @@
+# MLflow Tracking Server 접속 정보 (비민감 설정)
+# 민감하지 않은 URI/설정값은 ConfigMap으로 관리.
+# 변경 시 파이프라인 재컴파일 없이 kubectl apply 만으로 반영.
+#
+# 설치:
+#   kubectl apply -f mlops_platform/k8s/mlflow/configmap.yaml
+#
+# 수정 (MLflow 서버 주소 변경 시):
+#   kubectl edit configmap mlflow-config -n kubeflow
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlflow-config
+  namespace: kubeflow          # KFP Pod 와 동일 네임스페이스
+data:
+  MLFLOW_TRACKING_URI: "http://mlflow.mlops.svc.cluster.local:5000"
+  MLFLOW_S3_ENDPOINT_URL: "http://minio.mlops.svc.cluster.local:9000"
